@@ -1,0 +1,8 @@
+joblib==1.3.2
+keras_facenet==0.3.2
+mtcnn==0.1.1
+openai==0.28.0
+opencv_python
+python-dotenv==1.0.0
+numpy
+opencv-python-headless

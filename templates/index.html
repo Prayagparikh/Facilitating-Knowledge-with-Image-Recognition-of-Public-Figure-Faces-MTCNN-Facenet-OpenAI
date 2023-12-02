@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FaceTalesAI</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            margin: 0;
+            overflow-y: auto;
+        }
+
+        #upload-container {
+            text-align: center;
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #upload-box {
+            width: 800px;
+            height: 350px;
+            border: 2px dashed #ccc;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            overflow: hidden;
+            position: relative;
+        }
+
+        #file-input {
+            display: none;
+        }
+
+        #file-info {
+            margin-top: 20px;
+        }
+
+        #selected-image {
+            max-width: 100%;
+            max-height: 100%;
+            display: none;
+        }
+
+        #selected-image-name {
+            margin-top: 10px;
+        }
+
+        #detect-faces-btn {
+            margin-top: 10px;
+            cursor: pointer;
+            padding: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            display: none;
+        }
+
+        #detection-result {
+            width: 800px;
+            max-height: 200px;
+            border: 2px dashed #ccc;
+            display: flex;
+            overflow-x: auto;
+            margin-top: 20px;
+        }
+
+        .detected-face {
+            max-width: 160px;
+            height: auto;
+            margin-right: 10px;
+        }
+
+        #recognize-faces-btn {
+            margin-top: 10px;
+            cursor: pointer;
+            padding: 10px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            display: none;
+        }
+
+        #recognized-persons {
+            margin-top: 20px;
+            display: none;
+        }
+
+        #recognized-list {
+            list-style-type: none;
+            padding: 0;
+            text-align: center;
+            font-family: 'Arial', sans-serif;
+            font-size: 18px;
+            line-height: 1.5;
+        }
+
+        #recognized-list li {
+            margin: 5px 0;
+        }
+
+        #generate-openai-text-btn {
+            margin-top: 10px;
+            cursor: pointer;
+            padding: 10px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            display: none;
+        }
+
+        #openai-result-container {
+        display: none;
+        margin-top: 20px;
+        padding: 15px;
+        border: 2px solid #3498db;
+        border-radius: 8px;
+        text-align: center;
+        font-size: 18px;
+        font-family: 'Arial', sans-serif;
+    }
+
+    #openai-result-text {
+        max-width: 600px; /* Set your desired width */
+        max-height: 400px; /* Set your desired height */
+        overflow: auto; /* Add scrollbar if content exceeds the box */
+        margin: 0 auto; /* Center the content horizontally */
+        padding: 10px; /* Add padding for better appearance */
+        border: 2px solid #3498db; /* Border color */
+        border-radius: 8px; /* Border radius for rounded corners */
+        text-align: left; /* Align text to the left */
+        font-family: 'Arial', sans-serif; /* Set your desired font */
+        font-size: 16px; /* Set your desired font size */
+        line-height: 1.5; /* Set your desired line height */
+    }
+    #openai-result-list {
+        list-style-type: none;
+        padding: 0;
+    }
+    #openai-result-list li {
+        margin: 10px 0;
+        border: 1px solid #3498db;
+        border-radius: 5px;
+        padding: 10px;
+        background-color: #f2f2f2;
+        font-family: 'Arial', sans-serif;
+    }
+    </style>
+</head>
+<body>
+    <div id="upload-container">
+        <form id="upload-form" method="post" enctype="multipart/form-data">
+            <div id="upload-box" onclick="chooseFile()">
+                <div id="file-info">Click here to select .jpg, .jpeg, or .png file</div>
+                <input type="file" id="file-input" name="file" accept=".jpg, .png, .jpeg" onchange="displayFileName()">
+                <img id="selected-image" alt="Selected Image">
+            </div>
+            <div id="selected-image-name"></div>
+        </form>
+
+        <button id="detect-faces-btn" onclick="detectFaces()">Detect Faces</button>
+
+        <div id="detection-result"></div>
+
+        <button id="recognize-faces-btn" onclick="recognizeFaces()">Recognize Names of Detected Faces</button>
+
+        <div id="recognized-persons">
+            <h2>Recognized Persons</h2>
+            <ul id="recognized-list"></ul>
+        </div>
+
+        <button id="generate-openai-text-btn" onclick="generateOpenAIText()">Generate OpenAI Text</button>
+        <div id="openai-result-container"></div>
+    </div>
+
+    <script>
+        function chooseFile() {
+            document.getElementById('file-input').click();
+        }
+
+        async function displayFileName() {
+            const fileInput = document.getElementById('file-input');
+            const fileInfo = document.getElementById('file-info');
+            const selectedImage = document.getElementById('selected-image');
+            const selectedImageName = document.getElementById('selected-image-name');
+            const detectFacesBtn = document.getElementById('detect-faces-btn');
+            const recognizeFacesBtn = document.getElementById('recognize-faces-btn');
+
+            if (fileInput.files.length > 0) {
+                const fileName = fileInput.files[0].name;
+
+                fileInfo.textContent = `Selected file: ${fileName}`;
+                selectedImageName.textContent = fileName;
+
+                selectedImage.src = URL.createObjectURL(fileInput.files[0]);
+                selectedImage.style.display = 'block';
+                selectedImageName.style.display = 'block';
+
+                const formData = new FormData();
+                formData.append('file', fileInput.files[0]);
+
+                try {
+                    const response = await fetch('/', {
+                        method: 'POST',
+                        body: formData,
+                    });
+
+                    console.log(await response.text());
+                } catch (error) {
+                    console.error('Error:', error);
+                }
+                detectFacesBtn.style.display = 'block';
+                recognizeFacesBtn.style.display = 'none';
+            }
+        }
+
+        async function detectFaces() {
+            event.preventDefault();
+
+            try {
+                const response = await fetch('/detect_faces', {
+                    method: 'POST',
+                });
+
+                const { detected_faces_base64, num_faces } = await response.json();
+                console.log(detected_faces_base64);
+
+                const detectionResultDiv = document.getElementById('detection-result');
+                detectionResultDiv.innerHTML = '';
+
+                for (let i = 0; i < num_faces; i++) {
+                    const base64_data = detected_faces_base64[i];
+
+                    const imgElement = document.createElement('img');
+                    imgElement.src = `data:image/png;base64,${base64_data}`;
+                    imgElement.alt = `Detected Faces ${i + 1}`;
+                    imgElement.className = 'detected-face';
+                    detectionResultDiv.appendChild(imgElement);
+                }
+
+                detectionResultDiv.style.display = 'block';
+
+                // Show the recognize button after detecting faces
+                const recognizeFacesBtn = document.getElementById('recognize-faces-btn');
+                recognizeFacesBtn.style.display = 'block';
+
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        async function recognizeFaces() {
+            event.preventDefault();
+
+            try {
+                const response = await fetch('/recognize_faces', {
+                    method: 'POST',
+                });
+
+                const recognitionResultDiv = document.getElementById('recognized-persons');
+                // recognitionResultDiv.innerHTML = '';  
+
+                const { predicted_labels } = await response.json();
+                console.log(predicted_labels);
+
+                const recognizedList = document.createElement('ul');
+                recognizedList.id = 'recognized-list';
+
+                for (let i = 0; i < predicted_labels.length; i++) {
+                    const listItem = document.createElement('li');
+                    listItem.textContent = `• ${predicted_labels[i]}`;
+                    recognizedList.appendChild(listItem);
+                }
+
+                recognitionResultDiv.appendChild(recognizedList);
+                recognitionResultDiv.style.display = 'block';
+
+                // Show the Generate OpenAI Text button after recognizing faces
+                const generateOpenAiBtn = document.getElementById('generate-openai-text-btn');
+                generateOpenAiBtn.style.display = 'block';
+
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        async function generateOpenAIText() {
+            event.preventDefault();
+
+            try {
+                const response = await fetch('/openai_text', {
+                    method: 'POST',
+                });
+
+                const resultContainer = document.getElementById('openai-result-container');
+                const results = await response.json();
+
+                // Display the results in a list format
+                const resultList = document.createElement('ul');
+                resultList.id = 'openai-result-list';
+
+                for (const personName in results) {
+                    const listItem = document.createElement('li');
+                    listItem.innerHTML = `<strong>${personName}</strong><br>${results[personName]}`;
+                    resultList.appendChild(listItem);
+                }
+
+                // Update the result container
+                resultContainer.innerHTML = '';
+                resultContainer.appendChild(resultList);
+                resultContainer.style.display = 'block';
+
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+    </script>
+</body>
+</html>
